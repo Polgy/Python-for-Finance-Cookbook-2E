@@ -1,0 +1,132 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath,amssymb}
+
+\begin{document}
+
+\section*{Capped-Gain Payoff and its Expected Value}
+
+We consider a stock price $S_T$ (at future time $T$) following a lognormal distribution with initial price $S_0$. 
+We define a payoff function $\Pi(S_T)$, capped at threshold $H$, as follows:
+\[
+\Pi(S_T) 
+= 
+\begin{cases} 
+\alpha\,(S_T - S_0), & \quad S_T < H,\\[6pt]
+\alpha\,(H - S_0),   & \quad S_T \ge H,
+\end{cases}
+\]
+where $\alpha$ is a constant scaling parameter.
+
+\subsection*{Lognormal Distribution of $S_T$}
+Under the Black--Scholes model, $S_T$ is lognormally distributed. Specifically,
+\[
+\ln(S_T) \sim \mathcal{N}\!\Bigl(m,\;\sigma^2 T\Bigr)
+\quad\text{with}\quad
+m \;=\; \ln(S_0) + \bigl(r - \tfrac{1}{2}\sigma^2\bigr) T.
+\]
+Hence, the probability density function (PDF) of $S_T$ is given by
+\[
+f_{S_T}(s)
+\;=\;
+\frac{1}{s\,\sigma \sqrt{2\pi\,T}}
+\;\exp\!\Bigl(\!-\tfrac{(\ln s - m)^2}{2\,\sigma^2\,T}\Bigr),
+\quad
+s>0.
+\]
+
+\subsection*{Expected Payoff}
+The expected payoff under this model is the integral of $\Pi(s)$ against $f_{S_T}(s)$:
+\[
+\mathbb{E}\bigl[\Pi(S_T)\bigr]
+\;=\;
+\int_{0}^{\infty} \Pi(s)\,f_{S_T}(s)\,\mathrm{d}s.
+\]
+Splitting at $s=H$, we obtain
+\[
+\mathbb{E}\bigl[\Pi(S_T)\bigr]
+=
+\int_{0}^{H} \alpha\,(s - S_0)\,f_{S_T}(s)\,\mathrm{d}s
+\;+\;
+\int_{H}^{\infty} \alpha\,(H - S_0)\,f_{S_T}(s)\,\mathrm{d}s.
+\]
+In more compact notation:
+\[
+\mathbb{E}\bigl[\Pi(S_T)\bigr]
+\;=\;
+\alpha 
+\int_{0}^{H} (s - S_0)\,f_{S_T}(s)\,\mathrm{d}s
+\;+\;
+\alpha (H - S_0) 
+\int_{H}^{\infty} f_{S_T}(s)\,\mathrm{d}s.
+\]
+
+\end{document}
+
+
+import numpy as np
+from scipy.integrate import quad
+
+def lognormal_pdf(s, S0, r, sigma, T):
+    """
+    Returns the value of the lognormal pdf of S_T at s > 0,
+    where ln(S_T) ~ Normal(m, sigma^2 T).
+    """
+    if s <= 0:
+        return 0.0
+    # Mean of ln(S_T)
+    m = np.log(S0) + (r - 0.5 * sigma**2) * T
+    # log(s) - mean
+    z = (np.log(s) - m) / (sigma * np.sqrt(T))
+    # pdf
+    return (1.0 / (s * sigma * np.sqrt(2 * np.pi * T))) * np.exp(-0.5 * z**2)
+
+def integrand_below_H(s, S0, alpha, H, r, sigma, T):
+    """
+    Integrand for s in [0, H], i.e. alpha * (s - S0) * f_{S_T}(s).
+    """
+    return alpha * (s - S0) * lognormal_pdf(s, S0, r, sigma, T)
+
+def integrand_above_H(s, S0, alpha, H, r, sigma, T):
+    """
+    Integrand for s in [H, infty), i.e. alpha * (H - S0) * f_{S_T}(s).
+    """
+    return alpha * (H - S0) * lognormal_pdf(s, S0, r, sigma, T)
+
+def expected_payoff_capped_gain(S0, alpha, H, r, sigma, T):
+    """
+    Computes the expected payoff of:
+        Pi(S_T) = alpha*(S_T - S0) for S_T < H,
+                  alpha*(H - S0)   for S_T >= H
+    by direct numerical integration of the lognormal density.
+    """
+    # 1) Integrate from 0 to H: alpha*(s - S0)*f_{S_T}(s)
+    integral_below, _ = quad(integrand_below_H, 
+                             0, 
+                             H, 
+                             args=(S0, alpha, H, r, sigma, T))
+    
+    # 2) Integrate from H to infinity: alpha*(H - S0)*f_{S_T}(s)
+    integral_above, _ = quad(integrand_above_H, 
+                             H, 
+                             np.inf, 
+                             args=(S0, alpha, H, r, sigma, T))
+    
+    return integral_below + integral_above
+
+# Example usage:
+if __name__ == "__main__":
+    S0    = 100.0
+    alpha = 0.8
+    H     = 120.0
+    r     = 0.05     # 'drift' or risk-free rate
+    sigma = 0.2
+    T     = 1.0      # time in years
+    
+    # Compute the expected payoff via direct integration
+    result = expected_payoff_capped_gain(S0, alpha, H, r, sigma, T)
+    print("Expected Payoff via Numerical Integration: {:.4f}".format(result))
+
+    
+
+
+
